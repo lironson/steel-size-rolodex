@@ -8,6 +8,7 @@ Type a size and press **Enter**. The list snaps to the closest match, so near-mi
 - Spaces, `x`, `×` and `*` all work as separators, and case doesn't matter
 - **↑ / ↓** in the search box step one size at a time; clicking a row snaps to it
 - Shows mass (kg/m and lb/ft) and perimeter (mm and in) for the selected size
+- Draws the selected section to scale with imperial dimensions (d, bf, tf, tw, k, k1 for beams; legs and thickness for angles; size and wall for HSS and pipe)
 - Types covered: W, M, S, HP, C, MC, L, WT, HSS, Pipe (1,411 sizes)
 
 ## Use it
@@ -18,12 +19,22 @@ To host it on **GitHub Pages**, push this repo, then go to *Settings → Pages* 
 
 ## Updating the size table
 
-The data is embedded in `index.html` and generated from `data/Material_Database.xlsx`
-(columns: Type, Label (Metric), Label (Imperial), W (kg/m), Perimeter (mm)).
+The data is embedded in `index.html` and generated from two files:
+
+- `data/Material_Database.xlsx`: the size list (columns: Type, Label (Metric), Label (Imperial), W (kg/m), Perimeter (mm))
+- `data/aisc_dimensions.json`: section dimensions in inches, keyed by AISC name
 
 ```bash
 pip install openpyxl
 python tools/build_data.py
+```
+
+The dimensions come from the AISC Shapes Database v16, as bundled in the MIT-licensed
+[efficalc](https://pypi.org/project/efficalc/) package. To regenerate them:
+
+```bash
+pip install efficalc
+python tools/extract_aisc_dims.py
 ```
 
 ## How matching works
