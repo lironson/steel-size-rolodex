@@ -17,6 +17,10 @@ Open `index.html` in any browser. It's one self-contained file with no build ste
 
 To host it on **GitHub Pages**, push this repo, then go to *Settings → Pages* and set the source to the `main` branch, root folder.
 
+## Logo
+
+`assets/grizzly-logo.png` is the Grizzly Metal Fabrication logo as a transparent mask. It's embedded in `index.html` and drawn in the page's text colour, so it's white on the dark theme and black on the light theme.
+
 ## Updating the size table
 
 The data is embedded in `index.html` and generated from two files:
