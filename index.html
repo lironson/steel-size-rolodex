@@ -15,6 +15,9 @@
   --faint: #e6e6e6;
   --accent: #ff4f00;
   --on-accent: #ffffff;
+  --banana: #f4cf3a;
+  --banana-edge: #a8820f;
+  --banana-stem: #5b4320;
   --row-h: 52px;
   --f-display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
   --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -45,7 +48,7 @@ body {
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   column-gap: 40px;
   row-gap: 16px;
   padding-block: 20px;
@@ -165,6 +168,34 @@ button:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); out
 }
 .props dd, .dims dd { margin: 2px 0 0; font: 500 15px var(--f-mono); font-variant-numeric: tabular-nums; }
 .hint { font-size: 12px; color: var(--muted); margin: 0; }
+
+/* footer + banana switch */
+.foot {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 12px;
+  border-top: 1px solid var(--faint);
+  padding-top: 12px;
+}
+.switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.track {
+  position: relative; width: 38px; height: 22px; flex: none;
+  border: 1.5px solid var(--ink); border-radius: 11px;
+  transition: background .15s, border-color .15s;
+}
+.knob {
+  position: absolute; top: 3px; left: 3px; width: 13px; height: 13px;
+  border-radius: 50%; background: var(--ink);
+  transition: transform .15s, background .15s;
+}
+.switch input:checked + .track { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .track .knob { transform: translateX(16px); background: var(--on-accent); }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch-label { font: 600 13px var(--f-display); letter-spacing: 0.12em; text-transform: uppercase; }
+@media (prefers-reduced-motion: reduce) { .track, .knob { transition: none; } }
+#fig .banana { fill: var(--banana); stroke: var(--banana-edge); stroke-width: 1; }
+#fig .banana-ridge { fill: none; stroke: var(--banana-edge); stroke-width: 1; opacity: .55; }
+#fig .banana-stem { fill: var(--banana-stem); }
 kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4px; }
 
 /* section diagram */
@@ -246,6 +277,14 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
     <dl class="dims" id="dims"></dl>
     <p class="hint">Dimensions in inches, from AISC Shapes Database v16.</p>
   </section>
+
+  <footer class="foot">
+    <label class="switch" for="banana">
+      <input type="checkbox" id="banana" role="switch">
+      <span class="track" aria-hidden="true"><span class="knob"></span></span>
+      <span class="switch-label">Banana for scale</span>
+    </label>
+  </footer>
 </div>
 
 <script>
@@ -372,14 +411,38 @@ function thick(x1, y1, x2, y2, label, lx, ly, anchor) {
 }
 
 // fit a shape of width w by height h (inches) into the drawing box
+// a medium banana: 7" long, drawn in a 2.2" x 7" box
+const BANANA = { w: 2.2, h: 7 };
+let showBanana = false, lastBox = null;
+
 function fitBox(w, h) {
   const W = fig.clientWidth || 480, H = fig.clientHeight || 400;
   fig.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  const m = { l: 96, r: 120, t: 34, b: 64 };
-  const s = Math.min((W - m.l - m.r) / w, (H - m.t - m.b) / h);
-  const ox = m.l + (W - m.l - m.r - w * s) / 2;
-  const oy = m.t + (H - m.t - m.b - h * s) / 2;
-  return { s, ox, oy, W, H };
+  const m = { l: 132, r: 120, t: 34, b: 64 };
+  if (!showBanana) {
+    const s = Math.min((W - m.l - m.r) / w, (H - m.t - m.b) / h);
+    const ox = m.l + (W - m.l - m.r - w * s) / 2;
+    const oy = m.t + (H - m.t - m.b - h * s) / 2;
+    return (lastBox = { s, ox, oy, W, H });
+  }
+  // shape, then room for its callouts, then the banana; both stand on one baseline
+  const gap = 130, mr = 48, tall = Math.max(h, BANANA.h);
+  const s = Math.min((W - m.l - mr - gap) / (w + BANANA.w), (H - m.t - m.b) / tall);
+  const ox = m.l + (W - m.l - mr - gap - (w + BANANA.w) * s) / 2;
+  const base = m.t + (H - m.t - m.b + tall * s) / 2;
+  return (lastBox = { s, ox, oy: base - h * s, W, H,
+    banana: { x: ox + w * s + gap, y: base - BANANA.h * s, s } });
+}
+
+function drawBanana({ x, y, s }) {
+  const g = el('g', { transform: `translate(${x},${y}) scale(${s})` });
+  const ns = { 'vector-effect': 'non-scaling-stroke' };
+  el('path', { class: 'banana-stem', d: 'M0.18,1.05 L0.02,0.2 Q0.15,0.05 0.3,0.12 L0.58,0.95Z' }, g);
+  el('path', { class: 'banana', ...ns, d:
+    'M0.58,0.88 C2.6,2.0 2.5,5.6 0.42,6.92 Q0.3,7 0.22,6.86 C0.95,5.3 1.0,2.4 0.12,1.12 Q0.3,0.84 0.58,0.88Z' }, g);
+  el('path', { class: 'banana-ridge', ...ns, d: 'M0.4,0.98 C1.95,2.1 1.85,5.4 0.32,6.86' }, g);
+  el('ellipse', { class: 'banana-stem', cx: 0.32, cy: 6.92, rx: 0.1, ry: 0.07 }, g);
+  text(x + BANANA.w * s / 2, y + BANANA.h * s + 18, 'banana \u2248 7"', 'middle');
 }
 
 function centerlines(cx, cy, b) {
@@ -549,6 +612,7 @@ function renderSection(idx) {
     return;
   }
   DRAW[D.f](D);
+  if (showBanana && lastBox.banana) drawBanana(lastBox.banana);
   const vals = { ...D };
   if (D.f === 'O') vals.id = D.od - 2 * D.t;
   for (const [key, name] of LABELS[D.f]) {
@@ -646,6 +710,14 @@ q.addEventListener('keydown', e => {
     e.preventDefault();
     scrollToIdx(Math.max(0, Math.min(rows.length - 1, sel + (e.key === 'ArrowDown' ? 1 : -1))));
   }
+});
+
+const bananaToggle = document.getElementById('banana');
+try { bananaToggle.checked = showBanana = localStorage.getItem('banana') === '1'; } catch (e) {}
+bananaToggle.addEventListener('change', () => {
+  showBanana = bananaToggle.checked;
+  try { localStorage.setItem('banana', showBanana ? '1' : '0'); } catch (e) {}
+  if (sel >= 0) renderSection(sel);
 });
 
 build();

@@ -9,6 +9,7 @@ Type a size and press **Enter**. The list snaps to the closest match, so near-mi
 - **↑ / ↓** in the search box step one size at a time; clicking a row snaps to it
 - Shows mass (kg/m and lb/ft) and perimeter (mm and in) for the selected size
 - Draws the selected section to scale with imperial dimensions (d, bf, tf, tw, k, k1 for beams; legs and thickness for angles; size and wall for HSS and pipe)
+- **Banana for scale**: a switch at the bottom of the page adds a 7" banana beside the section, drawn at the same scale (remembered in your browser)
 - Types covered: W, M, S, HP, C, MC, L, WT, HSS, Pipe (1,411 sizes)
 
 ## Use it
