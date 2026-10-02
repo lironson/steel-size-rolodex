@@ -87,6 +87,7 @@ form { display: flex; gap: 8px; }
   color: var(--ink);
 }
 #q:focus { outline: none; border-bottom-color: var(--accent); }
+#q::placeholder { text-transform: none; font-weight: 400; font-size: 18px; color: var(--muted); opacity: 1; }
 button {
   font: 700 15px var(--f-display);
   letter-spacing: 0.1em;
@@ -255,7 +256,7 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
 
   <section class="left">
     <form id="f" autocomplete="off">
-      <input id="q" name="q" type="text" value="W310x29" placeholder="W310x29, HSS4x4x1/4, L102x102x12.7…" aria-label="Section size" spellcheck="false">
+      <input id="q" name="q" type="text" autofocus placeholder="Enter a size, e.g. HSS4x4x1/4" aria-label="Section size" spellcheck="false">
       <button type="submit">Find</button>
     </form>
     <div id="status" role="status"></div>
