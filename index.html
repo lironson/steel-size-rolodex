@@ -163,9 +163,11 @@ button:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); out
 
 .props {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--faint);
 }
 .props dd, .dims dd { margin: 2px 0 0; font: 500 15px var(--f-mono); font-variant-numeric: tabular-nums; }
 .hint { font-size: 12px; color: var(--muted); margin: 0; }
@@ -200,9 +202,18 @@ button:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); out
 kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4px; }
 
 /* section diagram */
-.sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.sec-title { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; min-width: 0; }
 #sec-name { font: 600 22px var(--f-mono); }
 #sec-alt { font: 500 14px var(--f-mono); color: var(--muted); }
+.units { display: inline-flex; border: 1.5px solid var(--ink); }
+.units button {
+  padding: 5px 12px;
+  font-size: 12px;
+  background: transparent; color: var(--ink);
+}
+.units button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.units button:hover { background: var(--accent); color: var(--on-accent); }
 .fig { flex: 1; min-height: 280px; position: relative; }
 #fig { position: absolute; inset: 0; width: 100%; height: 100%; }
 #fig .steel { fill: var(--ink); }
@@ -227,11 +238,13 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
   .app { height: auto; grid-template-rows: auto auto auto; }
   .wheel-wrap { flex: none; height: 300px; }
   .fig { flex: none; height: 300px; }
+  .with-banana .fig { height: 420px; }
 }
 @media (max-width: 820px) {
   .app { display: flex; flex-direction: column; height: auto; }
   .wheel-wrap { flex: none; height: 360px; }
   .fig { flex: none; height: 320px; }
+  .with-banana .fig { height: 440px; }
 }
 @media (max-width: 480px) {
   .logo { width: 95px; height: 48px; }
@@ -239,6 +252,7 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
   header { gap: 12px; }
   h1 { font-size: 20px; }
   .props { grid-template-columns: repeat(2, 1fr); }
+  .units button { padding: 5px 10px; }
   .dims { grid-template-columns: repeat(2, 1fr); }
   .m, .i { font-size: 16px; }
   .cols, .row { grid-template-columns: 40px 1fr 1fr; }
@@ -267,23 +281,27 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
       <div id="wheel" tabindex="-1"></div>
     </div>
 
-    <dl class="props">
-      <div><dt class="label">Mass</dt><dd id="d-kgm">–</dd></div>
-      <div><dt class="label">Weight</dt><dd id="d-lbft">–</dd></div>
-      <div><dt class="label">Perimeter</dt><dd id="d-pmm">–</dd></div>
-      <div><dt class="label">Perimeter</dt><dd id="d-pin">–</dd></div>
-    </dl>
     <p class="hint"><kbd>Enter</kbd> to snap · <kbd>↑</kbd><kbd>↓</kbd> to step through sizes</p>
   </section>
 
   <section class="right" aria-label="Section dimensions">
     <div class="sec-head">
-      <span id="sec-name">–</span>
-      <span id="sec-alt"></span>
+      <div class="sec-title">
+        <span id="sec-name">–</span>
+        <span id="sec-alt"></span>
+      </div>
+      <div class="units" role="group" aria-label="Dimension units">
+        <button type="button" id="u-in" data-u="in" aria-pressed="true">Imperial</button>
+        <button type="button" id="u-mm" data-u="mm" aria-pressed="false">Metric</button>
+      </div>
     </div>
     <div class="fig"><svg id="fig" role="img" aria-label="Cross-section with dimensions"></svg></div>
     <dl class="dims" id="dims"></dl>
-    <p class="hint">Dimensions in inches, from AISC Shapes Database v16.</p>
+    <dl class="props">
+      <div><dt class="label">Weight</dt><dd id="d-wt">–</dd></div>
+      <div><dt class="label">Perimeter</dt><dd id="d-per">–</dd></div>
+    </dl>
+    <p class="hint">From AISC Shapes Database v16. Metric dimensions are converted from inches.</p>
   </section>
 
   <footer class="foot">
@@ -372,7 +390,9 @@ function findClosest(input) {
 // ---------- section diagram ----------
 const fig = document.getElementById('fig');
 const SVGNS = 'http://www.w3.org/2000/svg';
-const inch = n => (+n.toFixed(3)).toString() + '"';
+// lengths are stored in inches; units switches the display between in and mm
+let units = 'in';
+const len = n => units === 'mm' ? `${+(n * 25.4).toFixed(1)} mm` : `${+n.toFixed(3)}"`;
 
 const LABELS = {
   I: [['d', 'Depth'], ['bf', 'Flange width'], ['tf', 'Flange thk'], ['tw', 'Web thk'], ['k', 'Flange to fillet (design)'], ['k1', 'Web ctr to fillet']],
@@ -433,6 +453,15 @@ function fitBox(w, h) {
     const oy = m.t + (H - m.t - m.b - h * s) / 2;
     return (lastBox = { s, ox, oy, W, H });
   }
+  if (W < 480) {
+    // narrow: the banana lies on its side under the shape, so the shape keeps its size
+    const below = 62, label = 30;
+    const s = Math.min((W - m.l - m.r) / w, (W - 32) / BANANA.h, (H - m.t - below - label) / (h + BANANA.w));
+    const ox = m.l + (W - m.l - m.r - w * s) / 2;
+    const oy = m.t + (H - m.t - below - label - (h + BANANA.w) * s) / 2;
+    const bx = Math.min(Math.max(ox + w * s / 2 - BANANA.h * s / 2, 16), W - 16 - BANANA.h * s);
+    return (lastBox = { s, ox, oy, W, H, banana: { x: bx, y: oy + h * s + below, s, lying: true } });
+  }
   // shape, then room for its callouts, then the banana; both stand on one baseline
   const gap = 130, mr = 48, tall = Math.max(h, BANANA.h);
   const s = Math.min((W - m.l - mr - gap) / (w + BANANA.w), (H - m.t - m.b) / tall);
@@ -442,15 +471,19 @@ function fitBox(w, h) {
     banana: { x: ox + w * s + gap, y: base - BANANA.h * s, s } });
 }
 
-function drawBanana({ x, y, s }) {
-  const g = el('g', { transform: `translate(${x},${y}) scale(${s})` });
+function drawBanana({ x, y, s, lying }) {
+  // lying: rotate the 2.2 x 7 box a quarter turn so it spans 7 wide x 2.2 tall
+  const g = el('g', { transform: lying
+    ? `translate(${x},${y + BANANA.w * s}) rotate(-90) scale(${s})`
+    : `translate(${x},${y}) scale(${s})` });
   const ns = { 'vector-effect': 'non-scaling-stroke' };
   el('path', { class: 'banana-stem', d: 'M0.18,1.05 L0.02,0.2 Q0.15,0.05 0.3,0.12 L0.58,0.95Z' }, g);
   el('path', { class: 'banana', ...ns, d:
     'M0.58,0.88 C2.6,2.0 2.5,5.6 0.42,6.92 Q0.3,7 0.22,6.86 C0.95,5.3 1.0,2.4 0.12,1.12 Q0.3,0.84 0.58,0.88Z' }, g);
   el('path', { class: 'banana-ridge', ...ns, d: 'M0.4,0.98 C1.95,2.1 1.85,5.4 0.32,6.86' }, g);
   el('ellipse', { class: 'banana-stem', cx: 0.32, cy: 6.92, rx: 0.1, ry: 0.07 }, g);
-  text(x + BANANA.w * s / 2, y + BANANA.h * s + 18, 'banana \u2248 7"', 'middle');
+  const [bw, bh] = lying ? [BANANA.h, BANANA.w] : [BANANA.w, BANANA.h];
+  text(x + bw * s / 2, y + bh * s + 18, 'banana \u2248 ' + (units === 'mm' ? '178 mm' : '7"'), 'middle');
 }
 
 function centerlines(cx, cy, b) {
@@ -474,22 +507,22 @@ function drawI(D) {
   // d
   const dx = xL - 36;
   ext(xL - 4, y0, dx - 6, y0); ext(xL - 4, y3, dx - 6, y3);
-  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + inch(d), 'end');
+  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + len(d), 'end');
   // bf
   const by = y3 + 30;
   ext(xL, y3 + 4, xL, by + 6); ext(xR, y3 + 4, xR, by + 6);
-  dimLine(xL, by, xR, by); text((xL + xR) / 2, by + 16, 'bf = ' + inch(bf), 'middle');
+  dimLine(xL, by, xR, by); text((xL + xR) / 2, by + 16, 'bf = ' + len(bf), 'middle');
   // tf at right tip of top flange
-  thick(xR + 12, y0, xR + 12, y1, 'tf = ' + inch(tf), xR + 22, (y0 + y1) / 2, 'start');
+  thick(xR + 12, y0, xR + 12, y1, 'tf = ' + len(tf), xR + 22, (y0 + y1) / 2, 'start');
   ext(xR + 2, y0, xR + 16, y0); ext(xR + 2, y1, xR + 16, y1);
   // tw across the web, a third of the way down
   const ty = Y(d * 0.36);
-  thick(wl, ty, wr, ty, 'tw = ' + inch(tw), wr + 22, ty, 'start');
+  thick(wl, ty, wr, ty, 'tw = ' + len(tw), wr + 22, ty, 'start');
   // k from top of flange to toe of fillet, beside the web
   const kx = wr + r + 12, ky = Y(k);
   ext(wr + 2, ky, kx + 6, ky);
   dimLine(kx, y0, kx, ky);
-  text(kx + 10, ky + 10, 'k = ' + inch(k), 'start');
+  text(kx + 10, ky + 10, 'k = ' + len(k), 'start');
 }
 
 function drawC(D) {
@@ -504,18 +537,18 @@ function drawC(D) {
     `M${x0},${y0}H${xR}V${y1}H${xw + r}A${r},${r} 0 0 0 ${xw},${y1 + r}V${y2 - r}A${r},${r} 0 0 0 ${xw + r},${y2}H${xR}V${y3}H${x0}Z` });
   const dx = x0 - 36;
   ext(x0 - 4, y0, dx - 6, y0); ext(x0 - 4, y3, dx - 6, y3);
-  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + inch(d), 'end');
+  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + len(d), 'end');
   const by = y3 + 30;
   ext(x0, y3 + 4, x0, by + 6); ext(xR, y3 + 4, xR, by + 6);
-  dimLine(x0, by, xR, by); text((x0 + xR) / 2, by + 16, 'bf = ' + inch(bf), 'middle');
-  thick(xR + 12, y0, xR + 12, y1, 'tf = ' + inch(tf), xR + 22, (y0 + y1) / 2, 'start');
+  dimLine(x0, by, xR, by); text((x0 + xR) / 2, by + 16, 'bf = ' + len(bf), 'middle');
+  thick(xR + 12, y0, xR + 12, y1, 'tf = ' + len(tf), xR + 22, (y0 + y1) / 2, 'start');
   ext(xR + 2, y0, xR + 16, y0); ext(xR + 2, y1, xR + 16, y1);
   const ty = Y(d * 0.62);
-  thick(x0, ty, xw, ty, 'tw = ' + inch(tw), xw + 22, ty, 'start');
+  thick(x0, ty, xw, ty, 'tw = ' + len(tw), xw + 22, ty, 'start');
   const kx = xw + r + 12, ky = Y(k);
   ext(xw + 2, ky, kx + 6, ky);
   dimLine(kx, y0, kx, ky);
-  text(kx + 10, ky + 10, 'k = ' + inch(k), 'start');
+  text(kx + 10, ky + 10, 'k = ' + len(k), 'start');
 }
 
 function drawT(D) {
@@ -530,18 +563,18 @@ function drawT(D) {
     `M${xL},${y0}H${xR}V${y1}H${wr + r}A${r},${r} 0 0 0 ${wr},${y1 + r}V${y3}H${wl}V${y1 + r}A${r},${r} 0 0 0 ${wl - r},${y1}H${xL}Z` });
   const dx = xL - 36;
   ext(xL - 4, y0, dx - 6, y0); ext(wl - 4, y3, dx - 6, y3);
-  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + inch(d), 'end');
+  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + len(d), 'end');
   const by = y0 - 18;
   ext(xL, y0 - 4, xL, by - 6); ext(xR, y0 - 4, xR, by - 6);
-  dimLine(xL, by, xR, by); text(xR + 8, by, 'bf = ' + inch(bf), 'start');
-  thick(xR + 12, y0, xR + 12, y1, 'tf = ' + inch(tf), xR + 22, (y0 + y1) / 2 + 4, 'start');
+  dimLine(xL, by, xR, by); text(xR + 8, by, 'bf = ' + len(bf), 'start');
+  thick(xR + 12, y0, xR + 12, y1, 'tf = ' + len(tf), xR + 22, (y0 + y1) / 2 + 4, 'start');
   ext(xR + 2, y0, xR + 16, y0); ext(xR + 2, y1, xR + 16, y1);
   const ty = Y(tf + (d - tf) * 0.7);
-  thick(wl, ty, wr, ty, 'tw = ' + inch(tw), wr + 22, ty, 'start');
+  thick(wl, ty, wr, ty, 'tw = ' + len(tw), wr + 22, ty, 'start');
   const kx = wr + r + 12, ky = Y(k);
   ext(wr + 2, ky, kx + 6, ky);
   dimLine(kx, y0, kx, ky);
-  text(kx + 10, ky + 10, 'k = ' + inch(k), 'start');
+  text(kx + 10, ky + 10, 'k = ' + len(k), 'start');
 }
 
 function drawL(D) {
@@ -554,16 +587,16 @@ function drawL(D) {
   el('path', { class: 'steel', d: `M${x0},${y0}H${xt}V${yt - r}A${r},${r} 0 0 0 ${xt + r},${yt}H${xR}V${y3}H${x0}Z` });
   const dx = x0 - 36;
   ext(x0 - 4, y0, dx - 6, y0); ext(x0 - 4, y3, dx - 6, y3);
-  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + inch(d), 'end');
+  dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + len(d), 'end');
   const by = y3 + 30;
   ext(x0, y3 + 4, x0, by + 6); ext(xR, y3 + 4, xR, by + 6);
-  dimLine(x0, by, xR, by); text((x0 + xR) / 2, by + 16, 'b = ' + inch(bw), 'middle');
+  dimLine(x0, by, xR, by); text((x0 + xR) / 2, by + 16, 'b = ' + len(bw), 'middle');
   const ty = Y(d * 0.25);
-  thick(x0, ty, xt, ty, 't = ' + inch(t), xt + 22, ty, 'start');
+  thick(x0, ty, xt, ty, 't = ' + len(t), xt + 22, ty, 'start');
   const kx = X(k), ky = yt - r - 14;
   ext(kx, yt - 2, kx, ky - 6);
   dimLine(x0, ky, kx, ky);
-  text(kx + 8, ky - 4, 'k = ' + inch(k), 'start');
+  text(kx + 8, ky - 4, 'k = ' + len(k), 'start');
 }
 
 function drawR(D) {
@@ -576,12 +609,12 @@ function drawR(D) {
     roundRect(x0, y0, W, H, ro) + roundRect(x0 + ts, y0 + ts, W - 2 * ts, H - 2 * ts, ri) });
   const dx = x0 - 36;
   ext(x0 - 4, y0, dx - 6, y0); ext(x0 - 4, y0 + H, dx - 6, y0 + H);
-  dimLine(dx, y0, dx, y0 + H); text(dx - 8, y0 + H / 2, 'h = ' + inch(h), 'end');
+  dimLine(dx, y0, dx, y0 + H); text(dx - 8, y0 + H / 2, 'h = ' + len(h), 'end');
   const by = y0 + H + 30;
   ext(x0, y0 + H + 4, x0, by + 6); ext(x0 + W, y0 + H + 4, x0 + W, by + 6);
-  dimLine(x0, by, x0 + W, by); text(x0 + W / 2, by + 16, 'b = ' + inch(bw), 'middle');
+  dimLine(x0, by, x0 + W, by); text(x0 + W / 2, by + 16, 'b = ' + len(bw), 'middle');
   const ty = y0 + H * 0.3;
-  thick(x0 + W - ts, ty, x0 + W, ty, 't = ' + inch(D.tn ?? t), x0 + W + 22, ty, 'start');
+  thick(x0 + W - ts, ty, x0 + W, ty, 't = ' + len(D.tn ?? t), x0 + W + 22, ty, 'start');
 }
 
 function roundRect(x, y, w, h, r) {
@@ -599,9 +632,9 @@ function drawO(D) {
     `M${cx - R + ts},${cy}a${R - ts},${R - ts} 0 1 0 ${2 * (R - ts)},0a${R - ts},${R - ts} 0 1 0 ${-2 * (R - ts)},0Z` });
   const by = cy + R + 30;
   ext(cx - R, cy + 4, cx - R, by + 6); ext(cx + R, cy + 4, cx + R, by + 6);
-  dimLine(cx - R, by, cx + R, by); text(cx, by + 16, 'OD = ' + inch(od), 'middle');
+  dimLine(cx - R, by, cx + R, by); text(cx, by + 16, 'OD = ' + len(od), 'middle');
   const a = -Math.PI / 4, c = Math.cos(a), n = Math.sin(a);
-  thick(cx + (R - ts) * c, cy + (R - ts) * n, cx + R * c, cy + R * n, 't = ' + inch(D.tn ?? t),
+  thick(cx + (R - ts) * c, cy + (R - ts) * n, cx + R * c, cy + R * n, 't = ' + len(D.tn ?? t),
         cx + R * c + 22, cy + R * n - 14, 'start');
 }
 
@@ -611,6 +644,12 @@ function renderSection(idx) {
   const [, metric, imperial, , , D] = DATA[idx];
   document.getElementById('sec-name').textContent = imperial || metric;
   document.getElementById('sec-alt').textContent = imperial ? metric : '';
+  const [, , , kgm, pmm] = DATA[idx];
+  const fmt = (n, d) => n == null ? '–' : n.toLocaleString(undefined, { maximumFractionDigits: d });
+  document.getElementById('d-wt').textContent =
+    units === 'mm' ? fmt(kgm, 2) + ' kg/m' : fmt(kgm * 0.671969, 2) + ' lb/ft';
+  document.getElementById('d-per').textContent =
+    units === 'mm' ? fmt(pmm, 0) + ' mm' : fmt(pmm / 25.4, 2) + ' in';
   fig.replaceChildren();
   const dims = document.getElementById('dims');
   dims.replaceChildren();
@@ -626,7 +665,7 @@ function renderSection(idx) {
   for (const [key, name] of LABELS[D.f]) {
     if (vals[key] == null) continue;
     const box = document.createElement('div');
-    box.innerHTML = `<dt class="label"><b>${key}</b>${name}</dt><dd>${inch(vals[key])}</dd>`;
+    box.innerHTML = `<dt class="label"><b>${key}</b>${name}</dt><dd>${len(vals[key])}</dd>`;
     dims.appendChild(box);
   }
 }
@@ -669,12 +708,6 @@ function select(idx) {
   if (rows[sel]) rows[sel].classList.remove('sel');
   sel = idx;
   rows[sel].classList.add('sel');
-  const [, , , kgm, pmm] = DATA[sel];
-  const fmt = (n, d) => n == null ? '–' : n.toLocaleString(undefined, { maximumFractionDigits: d });
-  document.getElementById('d-kgm').textContent = fmt(kgm, 2) + ' kg/m';
-  document.getElementById('d-lbft').textContent = fmt(kgm * 0.671969, 2) + ' lb/ft';
-  document.getElementById('d-pmm').textContent = fmt(pmm, 0) + ' mm';
-  document.getElementById('d-pin').textContent = fmt(pmm / 25.4, 2) + ' in';
   renderSection(sel);
 }
 
@@ -720,10 +753,22 @@ q.addEventListener('keydown', e => {
   }
 });
 
+const unitButtons = document.querySelectorAll('.units button');
+function setUnits(u) {
+  units = u;
+  unitButtons.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.u === u)));
+  try { localStorage.setItem('units', u); } catch (e) {}
+  if (sel >= 0) renderSection(sel);
+}
+unitButtons.forEach(b => b.addEventListener('click', () => setUnits(b.dataset.u)));
+try { if (localStorage.getItem('units') === 'mm') setUnits('mm'); } catch (e) {}
+
 const bananaToggle = document.getElementById('banana');
 try { bananaToggle.checked = showBanana = localStorage.getItem('banana') === '1'; } catch (e) {}
+document.querySelector('.right').classList.toggle('with-banana', showBanana);
 bananaToggle.addEventListener('change', () => {
   showBanana = bananaToggle.checked;
+  document.querySelector('.right').classList.toggle('with-banana', showBanana);
   try { localStorage.setItem('banana', showBanana ? '1' : '0'); } catch (e) {}
   if (sel >= 0) renderSection(sel);
 });
