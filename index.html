@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Steel Size Rolodex</title>
+<script>
+  // apply the saved theme before first paint so dark-mode users don't see a white flash
+  try { document.documentElement.dataset.theme = localStorage.getItem('theme') === 'dark' ? 'dark' : 'light'; }
+  catch (e) { document.documentElement.dataset.theme = 'light'; }
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -24,12 +29,7 @@
   --f-mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
   color-scheme: light;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #000000; --ink: #f2f2f2; --muted: #8a8a8a; --faint: #262626;
-    color-scheme: dark;
-  }
-}
+/* light is the default; the Dark mode switch sets data-theme="dark" */
 :root[data-theme="dark"] {
   --bg: #000000; --ink: #f2f2f2; --muted: #8a8a8a; --faint: #262626;
   color-scheme: dark;
@@ -173,7 +173,7 @@ button:focus-visible, .row:focus-visible { outline: 2px solid var(--accent); out
 /* footer + banana switch */
 .foot {
   grid-column: 1 / -1;
-  display: flex; align-items: center; gap: 12px;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
   border-top: 1px solid var(--faint);
   padding-top: 12px;
 }
@@ -319,6 +319,11 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
       <input type="checkbox" id="banana" role="switch">
       <span class="track" aria-hidden="true"><span class="knob"></span></span>
       <span class="switch-label">Banana for scale</span>
+    </label>
+    <label class="switch" for="dark">
+      <input type="checkbox" id="dark" role="switch">
+      <span class="track" aria-hidden="true"><span class="knob"></span></span>
+      <span class="switch-label">Dark mode</span>
     </label>
   </footer>
 </div>
@@ -784,6 +789,14 @@ function setUnits(u) {
 }
 unitButtons.forEach(b => b.addEventListener('click', () => setUnits(b.dataset.u)));
 try { if (localStorage.getItem('units') === 'mm') setUnits('mm'); } catch (e) {}
+
+const darkToggle = document.getElementById('dark');
+darkToggle.checked = document.documentElement.dataset.theme === 'dark';
+darkToggle.addEventListener('change', () => {
+  const theme = darkToggle.checked ? 'dark' : 'light';
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem('theme', theme); } catch (e) {}
+});
 
 const bananaToggle = document.getElementById('banana');
 try { bananaToggle.checked = showBanana = localStorage.getItem('banana') === '1'; } catch (e) {}
