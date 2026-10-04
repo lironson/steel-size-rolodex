@@ -244,15 +244,15 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
   .app { display: flex; flex-direction: column; height: auto; }
   .wheel-wrap { flex: none; height: 360px; }
   .fig { flex: none; height: 320px; }
-  /* one column: search, then the diagram and dimensions, then the rolodex */
+  /* one column: rolodex, then search, then the diagram and dimensions */
   .left, .right { display: contents; }
-  form { order: 1; }
-  #status { order: 2; }
-  .right > * { order: 3; }
-  .cols { order: 4; margin-top: 12px; }
-  .wheel-wrap { order: 5; }
-  .left > .hint { order: 6; }
-  .foot { order: 7; }
+  .cols { order: 1; }
+  .wheel-wrap { order: 2; }
+  form { order: 3; }
+  #status { order: 4; }
+  .right > * { order: 5; }
+  .foot { order: 6; }
+  .left > .hint { display: none; }  /* keyboard shortcuts don't apply on phones */
 }
 @media (max-width: 480px) {
   .logo { width: 95px; height: 48px; }
