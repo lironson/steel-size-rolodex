@@ -10,7 +10,7 @@ Type a size and press **Enter**. The list snaps to the closest match, so near-mi
 - Shows weight and perimeter under the section dimensions
 - **Imperial / Metric** switch on the diagram swaps every dimension, weight and perimeter between inches (lb/ft) and millimetres (kg/m); metric dimensions are converted from the AISC inch values
 - Draws the selected section to scale with imperial dimensions (d, bf, tf, tw, k, k1 for beams; legs and thickness for angles; size and wall for HSS and pipe)
-- **Banana for scale**: a switch at the bottom of the page adds a 7" banana beside the section, drawn at the same scale (remembered in your browser)
+- **Banana for scale**: a switch at the bottom of the page adds a 7" banana standing beside the section, drawn at the same scale (remembered in your browser)
 - Types covered: W, M, S, HP, C, MC, L, WT, HSS, Pipe (1,411 sizes)
 
 ## Updating the size table

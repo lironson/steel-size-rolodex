@@ -239,13 +239,11 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
   .app { height: auto; grid-template-rows: auto auto auto; }
   .wheel-wrap { flex: none; height: 300px; }
   .fig { flex: none; height: 300px; }
-  .with-banana .fig { height: 420px; }
 }
 @media (max-width: 820px) {
   .app { display: flex; flex-direction: column; height: auto; }
   .wheel-wrap { flex: none; height: 360px; }
   .fig { flex: none; height: 320px; }
-  .with-banana .fig { height: 440px; }
 }
 @media (max-width: 480px) {
   .logo { width: 95px; height: 48px; }
@@ -255,6 +253,7 @@ kbd { font: 500 11px var(--f-mono); border: 1px solid var(--faint); padding: 0 4
   .props { grid-template-columns: repeat(2, 1fr); }
   .units button { padding: 5px 10px; }
   #sec-name { font-size: 24px; }
+  #fig text { font-size: 12px; }
   .dims { grid-template-columns: repeat(2, 1fr); }
   .m, .i { font-size: 16px; }
   .cols, .row { grid-template-columns: 40px 1fr 1fr; }
@@ -414,7 +413,26 @@ function el(tag, attrs, parent) {
 function text(x, y, str, anchor = 'start', cls = '') {
   const t = el('text', { x, y, 'text-anchor': anchor, 'dominant-baseline': 'middle', class: cls });
   t.textContent = str;
+  // keep the label inside the drawing on narrow screens
+  const bb = t.getBBox(), W = fig.viewBox.baseVal.width || fig.clientWidth, pad = 4;
+  if (bb.width && bb.x < pad) t.setAttribute('x', x + pad - bb.x);
+  else if (bb.width && bb.x + bb.width > W - pad) t.setAttribute('x', x - (bb.x + bb.width - (W - pad)));
   return t;
+}
+
+// when a small drawing packs callouts together, step later labels down until they clear earlier ones
+function declutter() {
+  const placed = [];
+  for (const t of fig.querySelectorAll('text:not(.ax):not(.none)')) {
+    let bb = t.getBBox();
+    for (let i = 0; i < 6; i++) {
+      const hit = placed.find(p => bb.x < p.x + p.width && p.x < bb.x + bb.width && bb.y < p.y + p.height && p.y < bb.y + bb.height);
+      if (!hit) break;
+      t.setAttribute('y', +t.getAttribute('y') + (hit.y + hit.height - bb.y) + 2);
+      bb = t.getBBox();
+    }
+    placed.push(bb);
+  }
 }
 function arrowHead(x, y, ang) {
   const s = 7, w = 3;
@@ -455,17 +473,9 @@ function fitBox(w, h) {
     const oy = m.t + (H - m.t - m.b - h * s) / 2;
     return (lastBox = { s, ox, oy, W, H });
   }
-  if (W < 480) {
-    // narrow: the banana lies on its side under the shape, so the shape keeps its size
-    const below = 62, label = 30;
-    const s = Math.min((W - m.l - m.r) / w, (W - 32) / BANANA.h, (H - m.t - below - label) / (h + BANANA.w));
-    const ox = m.l + (W - m.l - m.r - w * s) / 2;
-    const oy = m.t + (H - m.t - below - label - (h + BANANA.w) * s) / 2;
-    const bx = Math.min(Math.max(ox + w * s / 2 - BANANA.h * s / 2, 16), W - 16 - BANANA.h * s);
-    return (lastBox = { s, ox, oy, W, H, banana: { x: bx, y: oy + h * s + below, s, lying: true } });
-  }
   // shape, then room for its callouts, then the banana; both stand on one baseline
-  const gap = 130, mr = 48, tall = Math.max(h, BANANA.h);
+  // (narrow drawings tighten the callout gap so the shape keeps a usable size)
+  const narrow = W < 480, gap = narrow ? 108 : 130, mr = narrow ? 36 : 48, tall = Math.max(h, BANANA.h);
   const s = Math.min((W - m.l - mr - gap) / (w + BANANA.w), (H - m.t - m.b) / tall);
   const ox = m.l + (W - m.l - mr - gap - (w + BANANA.w) * s) / 2;
   const base = m.t + (H - m.t - m.b + tall * s) / 2;
@@ -473,19 +483,15 @@ function fitBox(w, h) {
     banana: { x: ox + w * s + gap, y: base - BANANA.h * s, s } });
 }
 
-function drawBanana({ x, y, s, lying }) {
-  // lying: rotate the 2.2 x 7 box a quarter turn so it spans 7 wide x 2.2 tall
-  const g = el('g', { transform: lying
-    ? `translate(${x},${y + BANANA.w * s}) rotate(-90) scale(${s})`
-    : `translate(${x},${y}) scale(${s})` });
+function drawBanana({ x, y, s }) {
+  const g = el('g', { transform: `translate(${x},${y}) scale(${s})` });
   const ns = { 'vector-effect': 'non-scaling-stroke' };
   el('path', { class: 'banana-stem', d: 'M0.18,1.05 L0.02,0.2 Q0.15,0.05 0.3,0.12 L0.58,0.95Z' }, g);
   el('path', { class: 'banana', ...ns, d:
     'M0.58,0.88 C2.6,2.0 2.5,5.6 0.42,6.92 Q0.3,7 0.22,6.86 C0.95,5.3 1.0,2.4 0.12,1.12 Q0.3,0.84 0.58,0.88Z' }, g);
   el('path', { class: 'banana-ridge', ...ns, d: 'M0.4,0.98 C1.95,2.1 1.85,5.4 0.32,6.86' }, g);
   el('ellipse', { class: 'banana-stem', cx: 0.32, cy: 6.92, rx: 0.1, ry: 0.07 }, g);
-  const [bw, bh] = lying ? [BANANA.h, BANANA.w] : [BANANA.w, BANANA.h];
-  text(x + bw * s / 2, y + bh * s + 18, 'banana \u2248 ' + (units === 'mm' ? '178 mm' : '7"'), 'middle');
+  text(x + BANANA.w * s / 2, y + BANANA.h * s + 18, 'banana \u2248 ' + (units === 'mm' ? '178 mm' : '7"'), 'middle');
 }
 
 function centerlines(cx, cy, b) {
@@ -664,6 +670,7 @@ function renderSection(idx) {
   }
   DRAW[D.f](D);
   if (showBanana && lastBox.banana) drawBanana(lastBox.banana);
+  declutter();
   const vals = { ...D };
   if (D.f === 'O') vals.id = D.od - 2 * D.t;
   for (const [key, name] of LABELS[D.f]) {
@@ -769,10 +776,8 @@ try { if (localStorage.getItem('units') === 'mm') setUnits('mm'); } catch (e) {}
 
 const bananaToggle = document.getElementById('banana');
 try { bananaToggle.checked = showBanana = localStorage.getItem('banana') === '1'; } catch (e) {}
-document.querySelector('.right').classList.toggle('with-banana', showBanana);
 bananaToggle.addEventListener('change', () => {
   showBanana = bananaToggle.checked;
-  document.querySelector('.right').classList.toggle('with-banana', showBanana);
   try { localStorage.setItem('banana', showBanana ? '1' : '0'); } catch (e) {}
   if (sel >= 0) renderSection(sel);
 });
