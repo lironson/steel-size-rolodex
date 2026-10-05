@@ -675,7 +675,7 @@ function renderSection(idx) {
   document.getElementById('d-wt').textContent =
     units === 'mm' ? fmt(kgm, 2) + ' kg/m' : fmt(kgm * 0.671969, 2) + ' lb/ft';
   document.getElementById('d-per').textContent =
-    units === 'mm' ? fmt(pmm, 0) + ' mm' : fmt(pmm / 25.4, 2) + ' in';
+    units === 'mm' ? fmt(pmm, 0) + ' mm' : fmt(pmm / 25.4, 2) + '"';
   fig.replaceChildren();
   const dims = document.getElementById('dims');
   dims.replaceChildren();
