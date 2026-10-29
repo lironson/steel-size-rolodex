@@ -9,7 +9,7 @@ Type a size and press **Enter**. The list snaps to the closest match, so near-mi
 - **↑ / ↓** in the search box step one size at a time; clicking a row snaps to it
 - Shows weight and perimeter under the section dimensions
 - **Metric / Imperial** switch on the diagram swaps every dimension, weight and perimeter between inches (lb/ft) and millimetres (kg/m); metric dimensions are converted from the AISC inch values
-- Draws the selected section to scale with imperial dimensions (d, bf, tf, tw, k, k1 for beams; legs and thickness for angles; size and wall for HSS and pipe)
+- Draws the selected section to scale with imperial dimensions (d, bf, tf, tw, k, k1 for beams; legs and thickness for angles; size and wall for HSS and pipe). Channels (C, MC) are drawn with sloped inner flange faces (2:12 for C, a shallow ~3° for MC, whose slope varies by mill), a root fillet tangent to the web at k, and rounded flange toes; tf is the average thickness at mid-flange
 - **Banana for scale**: a switch at the bottom of the page adds a 7" banana standing beside the section, drawn at the same scale (remembered in your browser)
 - **Dark mode** switch under the banana switch; the page opens in light mode until you turn it on (remembered in your browser)
 - Types covered: W, M, S, HP, C, MC, L, WT, HSS, Pipe (1,411 sizes)

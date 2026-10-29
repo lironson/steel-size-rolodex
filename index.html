@@ -410,7 +410,7 @@ const len = n => units === 'mm' ? `${+(n * 25.4).toFixed(1)} mm` : `${+n.toFixed
 
 const LABELS = {
   I: [['d', 'Depth'], ['bf', 'Flange width'], ['tf', 'Flange thk'], ['tw', 'Web thk'], ['k', 'Flange to fillet (design)'], ['k1', 'Web ctr to fillet']],
-  C: [['d', 'Depth'], ['bf', 'Flange width'], ['tf', 'Flange thk'], ['tw', 'Web thk'], ['k', 'Flange to fillet (design)'], ['x', 'Centroid from back']],
+  C: [['d', 'Depth'], ['bf', 'Flange width'], ['tf', 'Flange thk (avg)'], ['tw', 'Web thk'], ['k', 'Flange to fillet (design)'], ['x', 'Centroid from back'], ['slope', 'Inner flange slope']],
   T: [['d', 'Depth'], ['bf', 'Flange width'], ['tf', 'Flange thk'], ['tw', 'Stem thk'], ['k', 'Flange to fillet (design)'], ['y', 'Centroid from top']],
   L: [['d', 'Leg'], ['b', 'Leg'], ['t', 'Thickness'], ['k', 'Heel to fillet (design)'], ['x', 'Centroid x'], ['y', 'Centroid y']],
   R: [['h', 'Height'], ['b', 'Width'], ['tn', 'Wall, nominal'], ['t', 'Wall, design']],
@@ -546,16 +546,43 @@ function drawI(D) {
   text(kx + 10, ky + 10, 'k = ' + len(k), 'start');
 }
 
+// closed path through pts [[x, y, r], ...], rounding each corner with radius r (0 = sharp)
+function filletPath(pts) {
+  const n = pts.length, out = [];
+  pts.forEach(([x, y, r], i) => {
+    const [px, py] = pts[(i + n - 1) % n], [nx, ny] = pts[(i + 1) % n];
+    const lu = Math.hypot(px - x, py - y), lw = Math.hypot(nx - x, ny - y);
+    const ux = (px - x) / lu, uy = (py - y) / lu, wx = (nx - x) / lw, wy = (ny - y) / lw;
+    const half = Math.acos(Math.max(-1, Math.min(1, ux * wx + uy * wy))) / 2;
+    // keep the tangent points on their edges
+    const t = Math.min(r / Math.tan(half), lu / 2, lw / 2), rr = t * Math.tan(half);
+    if (!(rr > 0)) { out.push(`${out.length ? 'L' : 'M'}${x},${y}`); return; }
+    const sweep = (x - px) * (ny - y) - (y - py) * (nx - x) > 0 ? 1 : 0;
+    out.push(`${out.length ? 'L' : 'M'}${x + ux * t},${y + uy * t}A${rr},${rr} 0 0 ${sweep} ${x + wx * t},${y + wy * t}`);
+  });
+  return out.join('') + 'Z';
+}
+
+// inner flange faces: C shapes slope 2 in 12 (ASTM A6); MC slopes vary by size and mill and are
+// much shallower, so they are drawn at about 3 degrees. tf is the average thickness, at mid-projection.
+const CHANNEL_SLOPE = { C: 2 / 12, MC: 1 / 20 };
+
 function drawC(D) {
   const { d, bf, tf, tw, k } = D;
   const b = fitBox(bf, d), s = b.s;
   const X = v => b.ox + v * s, Y = v => b.oy + v * s;
-  const r = Math.max(0, Math.min(k - tf, bf - tw, d / 2 - tf)) * s;
+  const m = D.slope, out = bf - tw, xm = tw + out / 2;
+  const tToe = Math.max(tf - m * out / 2, tf * 0.4), tRoot = tf + m * out / 2;
+  // root fillet tangent to the web at k; small radius at the flange toe
+  const r1 = Math.max(0, (k - tRoot) * Math.tan(Math.PI / 4 + Math.atan(m) / 2));
+  const r2 = Math.min(r1 / 2, tToe / 2);
   const x0 = X(0), xw = X(tw), xR = X(bf);
-  const y0 = Y(0), y1 = Y(tf), y2 = Y(d - tf), y3 = Y(d);
+  const y0 = Y(0), y1 = Y(tf), y3 = Y(d);
   centerlines(X(D.x ?? bf / 2), Y(d / 2), b);
-  el('path', { class: 'steel', d:
-    `M${x0},${y0}H${xR}V${y1}H${xw + r}A${r},${r} 0 0 0 ${xw},${y1 + r}V${y2 - r}A${r},${r} 0 0 0 ${xw + r},${y2}H${xR}V${y3}H${x0}Z` });
+  el('path', { class: 'steel', d: filletPath([
+    [x0, y0, 0], [xR, y0, 0], [xR, Y(tToe), r2 * s], [xw, Y(tRoot), r1 * s],
+    [xw, Y(d - tRoot), r1 * s], [xR, Y(d - tToe), r2 * s], [xR, y3, 0], [x0, y3, 0]]) });
+  const r = r1 * s;
   const dx = x0 - 36;
   ext(x0 - 4, y0, dx - 6, y0); ext(x0 - 4, y3, dx - 6, y3);
   dimLine(dx, y0, dx, y3); text(dx - 8, (y0 + y3) / 2, 'd = ' + len(d), 'end');
@@ -563,7 +590,7 @@ function drawC(D) {
   ext(x0, y3 + 4, x0, by + 6); ext(xR, y3 + 4, xR, by + 6);
   dimLine(x0, by, xR, by); text((x0 + xR) / 2, by + 16, 'bf = ' + len(bf), 'middle');
   thick(xR + 12, y0, xR + 12, y1, 'tf = ' + len(tf), xR + 22, (y0 + y1) / 2, 'start');
-  ext(xR + 2, y0, xR + 16, y0); ext(xR + 2, y1, xR + 16, y1);
+  ext(xR + 2, y0, xR + 16, y0); ext(X(xm), y1, xR + 16, y1);
   const ty = Y(d * 0.62);
   thick(x0, ty, xw, ty, 'tw = ' + len(tw), xw + 22, ty, 'start');
   const kx = xw + r + 12, ky = Y(k);
@@ -662,7 +689,8 @@ function drawO(D) {
 const DRAW = { I: drawI, C: drawC, T: drawT, L: drawL, R: drawR, O: drawO };
 
 function renderSection(idx) {
-  const [, metric, imperial, , , D] = DATA[idx];
+  const [type, metric, imperial, , , dims0] = DATA[idx];
+  const D = dims0 && dims0.f === 'C' ? { ...dims0, slope: CHANNEL_SLOPE[type] ?? CHANNEL_SLOPE.C } : dims0;
   // always Metric | Imperial; enlarge the one in the chosen units (metric when there is no imperial label)
   const m = document.getElementById('sec-m'), im = document.getElementById('sec-i');
   m.textContent = metric;
@@ -689,10 +717,11 @@ function renderSection(idx) {
   declutter();
   const vals = { ...D };
   if (D.f === 'O') vals.id = D.od - 2 * D.t;
+  if (D.f === 'C') vals.slope = type === 'MC' ? '\u2248 3\u00b0 (varies)' : '2:12 (9.5\u00b0)';
   for (const [key, name] of LABELS[D.f]) {
     if (vals[key] == null) continue;
     const box = document.createElement('div');
-    box.innerHTML = `<dt class="label"><b>${key}</b>${name}</dt><dd>${len(vals[key])}</dd>`;
+    box.innerHTML = `<dt class="label"><b>${key}</b>${name}</dt><dd>${typeof vals[key] === 'string' ? vals[key] : len(vals[key])}</dd>`;
     dims.appendChild(box);
   }
 }
